@@ -1,16 +1,16 @@
 import re
+import os
 import subprocess
 from datetime import datetime
-import os
 from influxdb import InfluxDBClient
 import logging
 
 # Configure logging
 logging.basicConfig(filename='internet_speed.log', level=logging.INFO)
 
-def run_speed_test():
+def run_speed_test(interface):
     try:
-        result = subprocess.run(['/usr/bin/speedtest', '--accept-license', '--accept-gdpr'], capture_output=True, text=True)
+        result = subprocess.run(['/usr/bin/speedtest', '--accept-license', '--accept-gdpr', '--interface', interface], capture_output=True, text=True)
         return result.stdout
     except subprocess.CalledProcessError as e:
         logging.error(f"Error running speedtest: {e}")
@@ -42,20 +42,25 @@ def write_speed_data(speed_data):
         logging.error(f"Error writing speed data to InfluxDB: {e}")
 
 def main():
-    output = run_speed_test()
-    if output:
-        speed_data = parse_speed_test_output(output)
-        if speed_data:
-            speed_data = [{
-                "measurement": "internet_speed",
-                "tags": {
-                    "host": "RaspberryPiMyLifeUp"
-                },
-                "time": datetime.utcnow().isoformat(),
-                "fields": speed_data
-            }]
-            write_speed_data(speed_data)
+    interfaces = ["eth0", "wlan0"]  # List of interfaces to test
+
+    for interface in interfaces:
+        output = run_speed_test(interface)
+        if output:
+            speed_data = parse_speed_test_output(output)
+            if speed_data:
+                speed_data = [{
+                    "measurement": "internet_speed",
+                    "tags": {
+                        "host": "raspberrypi",
+                        "interface": interface
+                    },
+                    "time": datetime.utcnow().isoformat(),
+                    "fields": speed_data
+                }]
+                write_speed_data(speed_data)
 
 if __name__ == "__main__":
     main()
+
 
